@@ -39,7 +39,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 def main():
     # git config --global http.proxy 127.0.0.1:10809
-    # git config --global unset http.proxy
+    # git config --global --unset http.proxy
     print("start...")
 
 
