@@ -5,6 +5,7 @@ import math
 import os
 import platform
 import re
+import sys
 import threading
 from urllib.parse import urlparse
 
@@ -28,8 +29,11 @@ class Spider:
         self.conf = util.read_conf(conf_fp)
         self.conf["g_src_dir"] = os.path.join(self.conf["data_dir"], self.conf["src_dir"])
         self.conf["g_dst_dir"] = os.path.join(self.conf["data_dir"], self.conf["dst_dir"])
-        self.src_file_name = util.select_file(self.conf["g_src_dir"])
-        self.abs_src_file_name = os.path.join(self.conf["g_src_dir"], self.src_file_name)
+        (self.src_file_name, self.abs_src_file_name) = util.select_file(self.conf["g_src_dir"])
+        if self.src_file_name is None:
+            return
+        else:
+            print(self.abs_src_file_name)
         self.conf["f_dst_dir"] = os.path.join(self.conf["g_dst_dir"], os.path.splitext(self.src_file_name)[0])
         self.conf["dst_file"] = os.path.join(self.conf["f_dst_dir"],
                                              "核_" + os.path.splitext(self.src_file_name)[0] + ".xlsx")
@@ -205,6 +209,8 @@ class Spider:
         # retry
         start = datetime.datetime.now()
         self.init_data()
+        if self.data.__len__() == 0:
+            return
         results_Retry = self.data
         for i in range(1, self.conf["run_counts"] + 1):
             print("*****运行第 %d 次, 待处理网址：%d" % (i, results_Retry.__len__()))
@@ -230,8 +236,10 @@ class Spider:
         self.statistics_data()
         end = datetime.datetime.now()
         print("====================\n任务结束，耗时 %d 秒, \n拨测结果：%d条" % ((end - start).seconds, len(self.data)))
+        print("结果保存目录:", os.path.join(os.getcwd(), self.conf["dst_file"]).replace("./", ""))
         if platform.system() == "Windows":
             os.system("pause")
+
 
 def main():
     # git rm -r --cached .

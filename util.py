@@ -29,17 +29,30 @@ from tldextract import tldextract
 
 def select_file(fp):
     import shutil
-    files = os.listdir(fp)
-    files_set = []
-    print("文件列表：")
-    for file in files:
-        if os.path.splitext(file)[1] in [".xlsx", ".xls", '.docx', '.txt']:
-            files_set.append(file)
-            print('[', len(files_set), ']:', file)
-    index = input("支持文件格式[.txt|.xlsx|.xls|.docx]，请输入对应文件的序号:")
-    file_name = files_set[int(index) - 1]
-    dst_file = file_name
-    return dst_file
+    if platform.system() == "Windows":
+        os.system("ipconfig/flushdns")
+        from tkinter import Tk
+        from tkinter import filedialog
+        root = Tk()
+        root.withdraw()
+        try:
+            filename = filedialog.askopenfilename(initialdir=fp)
+        except:
+            print("选择文件失败，程序结束")
+            return None, None
+        return os.path.basename(filename), filename
+    else:
+        files = os.listdir(fp)
+        files_set = []
+        print("文件列表：")
+        for file in files:
+            if os.path.splitext(file)[1] in [".xlsx", ".xls", '.docx', '.txt']:
+                files_set.append(file)
+                print('[', len(files_set), ']:', file)
+        index = input("支持文件格式[.txt|.xlsx|.xls|.docx]，请输入对应文件的序号:")
+        file_name = files_set[int(index) - 1]
+        dst_file = file_name
+        return dst_file, os.path.join(fp, dst_file)
 
 
 # 读取基本配置 in json format
@@ -164,18 +177,26 @@ def get_ips(domain, default_servers=None, quiet=False):
     except dns.resolver.NXDOMAIN:
         if not quiet:
             print("[.] Resolved but no entry for " + str(domain))
+        else:
+            print("[.] Resolved but no entry for " + str(domain))
         return 2, None
     except dns.resolver.NoNameservers:
         if not quiet:
             print("[-] Answer refused for " + str(domain))
+        else:
+            print("[.] Resolved but no entry for " + str(domain))
         return 3, None
     except dns.resolver.NoAnswer:
         if not quiet:
             print("[-] No answer section for " + str(domain))
+        else:
+            print("[.] Resolved but no entry for " + str(domain))
         return 4, None
     except dns.exception.Timeout:
         if not quiet:
-            print("[-] Timeout")
+            print("[-] Timeout " + str(domain))
+        else:
+            print("[.] Resolved but no entry for " + str(domain))
         return 5, None
 
 
