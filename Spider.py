@@ -27,6 +27,7 @@ class Spider:
         if conf_fp is None:
             conf_fp = "./conf/config.json"
         self.conf = util.read_conf(conf_fp)
+
         self.conf["g_src_dir"] = os.path.join(self.conf["data_dir"], self.conf["src_dir"])
         self.conf["g_dst_dir"] = os.path.join(self.conf["data_dir"], self.conf["dst_dir"])
         (self.src_file_name, self.abs_src_file_name) = util.select_file(self.conf["g_src_dir"])
@@ -37,6 +38,10 @@ class Spider:
         self.conf["f_dst_dir"] = os.path.join(self.conf["g_dst_dir"], os.path.splitext(self.src_file_name)[0])
         self.conf["dst_file"] = os.path.join(self.conf["f_dst_dir"],
                                              "核_" + os.path.splitext(self.src_file_name)[0] + ".xlsx")
+        if not os.path.exists(self.conf["data_dir"]):
+            os.mkdir(self.conf["data_dir"])
+        if not os.path.exists(self.conf["g_dst_dir"]):
+            os.mkdir(self.conf["g_dst_dir"])
         if not os.path.exists(self.conf["f_dst_dir"]):
             os.mkdir(self.conf["f_dst_dir"])
         if self.conf["SCREEN"]:
@@ -82,7 +87,7 @@ class Spider:
             book = xlrd.open_workbook(self.abs_src_file_name)
             ws = book.sheet_by_index(0)
             for r in range(0, ws.nrows):
-                row_t = [r]
+                row_t = [r+1]
                 for i in range(0, 2):
                     row_t.append(ws.cell(r, i).value)
                 self.data.append(row_t)
@@ -114,7 +119,8 @@ class Spider:
             else:
                 for ii in range(0, len_t):
                     i.append('')
-            i[14] = r_code
+            if r_code >0:
+                i[14] = r_code
         if os.path.splitext(self.src_file_name)[1] in ['.xlsx']:
             if not os.path.exists(self.conf["dst_file"]):
                 shutil.copyfile(self.abs_src_file_name, self.conf["dst_file"])
@@ -200,12 +206,15 @@ class Spider:
             elif value[13] != "异常":
                 da_statics["失败"] = da_statics["失败"] + 1
             da_list.append(da_t)
+        print("结果汇总：", da_statics)
         if self.conf["all_records"]:
             util.update_task_excel(self.data_res_f, self.conf["dst_file"], sheet_name='全量结果', title="all")
         util.update_task_excel(da_list, self.conf["dst_file"], sheet_name='核查结果', title="smp")
         util.update_tj_excel(da_statics, os.path.join(self.conf["g_dst_dir"], self.conf["tongji"]))
 
     def run(self):
+        if self.src_file_name is None:
+            return
         # retry
         start = datetime.datetime.now()
         self.init_data()
@@ -242,9 +251,6 @@ class Spider:
 
 
 def main():
-    # git rm -r --cached .
-    # git add .
-    # git commit -m "update"
     # [2, 2, 'www.baidu.com', 'http://www.baidu.com', 'www.baidu.com', ['39.156.66.14', '39.156.66.18'], '境内',
     # '中国·北京', '百度一下，你就知道', 'https://www.baidu.com/', '是', 'https://www.baidu.com', '', '是', '', 1]
     # pyinstaller -F main.py

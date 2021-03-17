@@ -9,7 +9,7 @@ import random
 import re
 import sqlite3
 import time
-from telnetlib import EC
+from selenium.webdriver.support import expected_conditions as EC
 from urllib.parse import urlparse
 import dns.resolver
 import ipdb
@@ -25,19 +25,20 @@ from selenium.webdriver.common.by import By
 # 选择源文件
 from selenium.webdriver.support.wait import WebDriverWait
 from tldextract import tldextract
+import traceback
 
 
 def select_file(fp):
     import shutil
+    print("支持文件格式[.txt|.xlsx|.xls|.docx]")
     if platform.system() == "Windows":
         os.system("ipconfig/flushdns")
         from tkinter import Tk
         from tkinter import filedialog
         root = Tk()
         root.withdraw()
-        try:
-            filename = filedialog.askopenfilename(initialdir=fp)
-        except:
+        filename = filedialog.askopenfilename(initialdir=fp)
+        if not filename:
             print("选择文件失败，程序结束")
             return None, None
         return os.path.basename(filename), filename
@@ -78,7 +79,7 @@ def list_split(listTemp, n):
 
 
 # 获取状态码和实际url（如发生跳转，返回跳转后的新url）
-def get_status(url, quiet=False):
+def get_status(url, quiet=False, logf=None):
     import urllib3
     urllib3.disable_warnings()
     headers = {
@@ -88,35 +89,52 @@ def get_status(url, quiet=False):
     s.mount('http://', HTTPAdapter(max_retries=3))
     s.mount('https://', HTTPAdapter(max_retries=3))
     try:
-        r = s.get(url=url, headers=headers, verify=False, timeout=(10, 5), allow_redirects=False)
-        if not quiet:
-            print(url, "\t:", r.status_code)
-        s.close()
-        if r.status_code in [301, 302]:
-            return r.status_code, "SUCCESS", r.headers["Location"]
-        else:
-            return r.status_code, "SUCCESS", url
+        # 最多n次跳转
+        n = 3
+        while n > 0:
+            n = n - 1
+            r = s.get(url=url, headers=headers, verify=False, timeout=(10, 5), allow_redirects=False)
+            if not quiet:
+                print(url, "\t:", r.status_code)
+            print(r.headers)
+            if r.status_code in [301, 302]:
+                url = r.headers["Location"]
+            else:
+                s.close()
+                return r.status_code, "SUCCESS", url
     except requests.exceptions.ConnectTimeout as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("ConnectTimeout:\t", url)
         return e.errno, "ConnectTimeout", url
     except requests.exceptions.ReadTimeout as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("ReadTimeout:\t", url)
         return e.errno, "ReadTimeout", url
     except requests.exceptions.ConnectionError as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("ConnectionError:\t", url)
         return e.errno, "ConnectionError", url
     except requests.exceptions.HTTPError as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("HTTPError:\t", url)
         return e.errno, "HTTPError", url
     except requests.exceptions.ConnectionResetError as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("ConnectionResetError:\t", url)
         return e.errno, "ConnectionResetError", url
     except Exception as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("未知错误:\t", url, e.__str__())
         s.close()
@@ -154,13 +172,13 @@ def get_url_normalize(url, short_urls=None):
             # print((code, status, r_url))
             return code, r_url
         else:
-            return 200, url_new
+            return -1, url_new
     else:
         return 500, url_new
 
 
 # 解析IP地址，返回状态码，以及对应的IP列表
-def get_ips(domain, default_servers=None, quiet=False):
+def get_ips(domain, default_servers=None, quiet=False, logf=None):
     ips = []
     myResolver = dns.resolver.Resolver()
     if default_servers:
@@ -175,24 +193,32 @@ def get_ips(domain, default_servers=None, quiet=False):
             print("IPS: ", domain, ips)
         return 1, list(set(ips))
     except dns.resolver.NXDOMAIN:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("[.] Resolved but no entry for " + str(domain))
         else:
             print("[.] Resolved but no entry for " + str(domain))
         return 2, None
     except dns.resolver.NoNameservers:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("[-] Answer refused for " + str(domain))
         else:
             print("[.] Resolved but no entry for " + str(domain))
         return 3, None
     except dns.resolver.NoAnswer:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("[-] No answer section for " + str(domain))
         else:
             print("[.] Resolved but no entry for " + str(domain))
         return 4, None
     except dns.exception.Timeout:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if not quiet:
             print("[-] Timeout " + str(domain))
         else:
@@ -232,6 +258,23 @@ def init_driver(conf=None, PC=True):
     return driver
 
 
+def init_driver_2(conf=None, PC=True):
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+
+    chrome_options = Options()
+    chrome_options.add_argument('--ignore-certificate-errors')
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    chrome_options.add_argument("--headless")
+    s = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=s, options=chrome_options)
+    return driver
+
+
 # 修订IP地址，ip138，返回：境内外，详情
 def ip_fix(driver, ipstr, locat=None, detail=None, ip138=None, ipipnet=None):
     try:
@@ -267,10 +310,9 @@ def do_dns(data, conf=None):
         conf = {}
         conf["conf"] = "./conf"
     if conf["ip_fix"]:
-        driver = init_driver(conf)
+        driver = init_driver(conf=conf)
     data_res = []
     for value in data:
-
         if value[3] == "异常":
             continue
         if value[5] != '' and value[5] != "异常":
@@ -284,7 +326,7 @@ def do_dns(data, conf=None):
             value[5] = myaddr
             value[12] = "无"
         else:
-            (retn, retv) = get_ips(domain, quiet=True)
+            (retn, retv) = get_ips(domain, quiet=True, logf=os.path.join(conf["f_dst_dir"], 'log.txt'))
             if retn == 1:
                 value[5] = retv
             else:
@@ -329,7 +371,7 @@ def save_string_pic(conf, screen, strmsg):
 
 
 # 单次浏览器访问网页获取内容
-def do_url(conf, driver, url, screen=None, pagesrc=None):
+def do_url(conf, driver, url, screen=None, pagesrc=None, logf=None):
     # print("*****正在处理：", url)
     title = None
     current_url = url[3]
@@ -352,7 +394,9 @@ def do_url(conf, driver, url, screen=None, pagesrc=None):
         driver.save_screenshot(screen)
         source = driver.page_source
     except UnexpectedAlertPresentException as e:
-        # print("\t弹窗:", url[3], e.__str__()[0:80])
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
+        print("\t弹窗:", url[3], e.__str__()[0:80])
         while True:
             try:
                 WebDriverWait(driver, 10, 0.5).until(EC.alert_is_present())
@@ -370,6 +414,8 @@ def do_url(conf, driver, url, screen=None, pagesrc=None):
         driver.save_screenshot(screen)
         source = driver.page_source
     except Exception as e:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         if "net::ERR_CONNECTION_RESET" in e.__str__():
             ERRORNUM = 1
         elif "net::ERR_NAME_NOT_RESOLVED" in e.__str__():
@@ -386,6 +432,7 @@ def do_url(conf, driver, url, screen=None, pagesrc=None):
             ERRORNUM = 7
             ERRORSTR[7] = e.__str__()[0:20]
             print("*****获取标题失败:", url[1], ":", ERRORNUM, url[2], e.__str__()[0:80])
+        print("\t异常:", url[3], e.__str__()[0:80])
         title = "异常"
         current_url = url[3]
         save_string_pic(conf, screen, ERRORSTR[ERRORNUM])
@@ -394,6 +441,8 @@ def do_url(conf, driver, url, screen=None, pagesrc=None):
             title = url[3]
             ERRORNUM = 0
     finally:
+        with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
+            traceback.print_exc(file=f)
         # print("\tfinally执行:", url)
         # print("\t", title, driver.current_url, ERRORNUM)
         with open(pagesrc, 'wb') as f:
@@ -406,7 +455,7 @@ def do_web(data=None, conf=None):
     # print("\tweb访问...")
     if data is None:
         return
-    driver = init_driver(conf, PC=conf["PC"])
+    driver = init_driver(conf=conf, PC=conf["PC"])
     if conf["PC"] and conf["screensize"]:
         driver.set_window_size(conf["screensize"][0], conf["screensize"][1])
     for value in data:
@@ -425,7 +474,8 @@ def do_web(data=None, conf=None):
         #     if os.path.exists(screen_file):
         #         print("\t更新....", str(value[1]) + "_" + value[4])
         page_file = os.path.join(conf["pagesource_dir"], str(value[1]) + "_" + value[4] + ".html")
-        (title, url, FD) = do_url(conf["conf"], driver, value, screen=screen_file, pagesrc=page_file)
+        (title, url, FD) = do_url(conf["conf"], driver, value, screen=screen_file, pagesrc=page_file,
+                                  logf=os.path.join(conf["f_dst_dir"], 'log.txt'))
         value[8] = title
         value[9] = url
         default_pro = urlparse(value[2]).scheme
@@ -528,7 +578,7 @@ def do_alexa(conf, data=None):
         else:
             alexa_yes.append(value)
     alexa_way = conf["ONLINE"]
-    driver = init_driver(conf)
+    # driver = init_driver(conf)
     c = None
     if conf["OFFLINE"]:
         conn = sqlite3.connect(os.path.join(conf["conf"], conf["LOCAL_DB"]))
@@ -553,10 +603,12 @@ def do_alexa(conf, data=None):
             # time.sleep(random.uniform(1, 4))
             value[12] = alexa_d
     elif alexa_way == 2:  # link 114
+        driver = init_driver(conf=conf)
         alexa_yes = do_domain_alexa_114(driver, alexa_yes)
+        driver.quit()
     if c:
         c.close()
-    driver.quit()
+
     alexa_yes.extend(alexa_no)
     return alexa_yes
 
@@ -673,3 +725,36 @@ def update_tj_excel(data, filename):
     ws.cell(row=ws.max_row, column=15).value = '{:.1f}%'.format(data["失败"] * 100 / data["总共"])
     ws.cell(row=ws.max_row, column=16).value = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     wb.save(filename)
+
+
+def test():
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    chrome_options = Options()
+    # chrome_options.add_argument('--ignore-certificate-errors')
+    # chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+
+    chrome_options.add_argument(
+        'user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36')
+    service = Service("./conf/chromedriver.exe")
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument('--headless')
+    driver = webdriver.Chrome(options=chrome_options, service=service)
+    # 打开百度
+    driver.get("https://www.baidu.com/")
+    driver.quit()
+
+
+def main():
+    # url = "http://www.baidu.com"
+    # conf = {"conf": "./conf", "head_less": True, "timeout_s": 20}
+    # driver = init_driver(conf=conf)
+    # driver.get(url)
+    # time.sleep(5)
+    # driver.quit()
+    test()
+
+
+if __name__ == "__main__":
+    main()
