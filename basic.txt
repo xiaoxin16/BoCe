@@ -1,4 +1,0 @@
-pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-# git rm -r --cached .
-# git add .
-# git commit -m "update"

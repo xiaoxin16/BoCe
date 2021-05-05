@@ -64,7 +64,7 @@ class Spider:
         if self.data.__len__() > 0:
             return
         if os.path.splitext(self.src_file_name)[1] in ['.txt']:
-            file_object = open(os.path.join(self.conf["g_src_dir"], self.src_file_name), 'r', encoding='utf-8')
+            file_object = open(self.abs_src_file_name, 'r', encoding='utf-8')
             lines = file_object.readlines()
             file_object.close()
             for line in lines:
@@ -81,8 +81,11 @@ class Spider:
             for r in range(1, ws.max_row + 1):
                 row_t = [r]
                 for i in range(1, 3):
-                    row_t.append(ws.cell(row=r, column=i).value)
-                self.data.append(row_t)
+                    if ws.cell(row=r, column=i).value:
+                        row_t.append(ws.cell(row=r, column=i).value)
+                        row_t[1] = int(row_t[1])
+                if row_t.__len__() == 3 and row_t[1] and row_t[2]:
+                    self.data.append(row_t)
         elif os.path.splitext(self.src_file_name)[1] in ['.xls']:
             book = xlrd.open_workbook(self.abs_src_file_name)
             ws = book.sheet_by_index(0)
@@ -90,6 +93,8 @@ class Spider:
                 row_t = [r+1]
                 for i in range(0, 2):
                     row_t.append(ws.cell(r, i).value)
+                    row_t[1] = int(row_t[1])
+                # print(row_t)
                 self.data.append(row_t)
         elif os.path.splitext(self.src_file_name)[1] in ['.docx']:
             d = docx.opendocx(self.abs_src_file_name)
@@ -179,11 +184,11 @@ class Spider:
         return self.data_res
 
     # 统计
-    def statistics_data(self):
+    def statistics_data(self, tcoast=""):
         da_list = []
         da_statics = {"task": self.src_file_name, "总共": self.data.__len__(),
                       "正常": 0, "异常": 0, "境内": 0, "境外": 0, "跳转": 0,
-                      "重点": 0, "非重点": 0, "打开": 0, "失败": 0}
+                      "重点": 0, "非重点": 0, "打开": 0, "失败": 0, "耗时": tcoast, "进程数":self.conf["poll"]}
         for value in self.data_res_f:
             # print(len(value), value)
             da_t = [value[0], value[1], value[3], value[6], value[12], value[13]]
@@ -242,9 +247,10 @@ class Spider:
             self.data_res_f.extend(results_OK)
         self.data_res_f.extend(results_Retry)
         self.data_res_f = util.do_alexa(data=self.data_res_f, conf=self.conf)
-        self.statistics_data()
         end = datetime.datetime.now()
-        print("====================\n任务结束，耗时 %d 秒, \n拨测结果：%d条" % ((end - start).seconds, len(self.data)))
+        tt = str(datetime.timedelta(seconds=(end - start).seconds))
+        self.statistics_data(tcoast=tt)
+        print("====================\n%s任务结束，耗时 %s, \n拨测结果：%d条" % (end.strftime("%Y-%m-%d %H:%M:%S"), tt, len(self.data)))
         print("结果保存目录:", os.path.join(os.getcwd(), self.conf["dst_file"]).replace("./", ""))
         if platform.system() == "Windows":
             os.system("pause")
