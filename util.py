@@ -163,19 +163,20 @@ def get_url_normalize(url, short_urls=None):
     if url_new != "异常":
         # return 200, url_new
         domain = urlparse(url_new).hostname
-        if domain in short_urls:
-            # print("短域名 ", url_new)
-            (code, status, r_url) = get_status(url_new, quiet=True)
-            # print((code, status, r_url))
-            return code, r_url
-            # print("\t跳转网址：", url_new)
-        elif len(domain) < 6:
-            print("疑似短域名 ", domain)
-            (code, status, r_url) = get_status(url_new, quiet=True)
-            # print((code, status, r_url))
-            return code, r_url
-        else:
-            return -1, url_new
+        # if domain in short_urls:
+        #     # print("短域名 ", url_new)
+        #     (code, status, r_url) = get_status(url_new, quiet=True)
+        #     # print((code, status, r_url))
+        #     return code, r_url
+        #     # print("\t跳转网址：", url_new)
+        # elif len(domain) < 2:
+        #     print("疑似短域名 ", domain)
+        #     (code, status, r_url) = get_status(url_new, quiet=True)
+        #     # print((code, status, r_url))
+        #     return code, r_url
+        # else:
+        #     return -1, url_new
+        return -1, url_new
     else:
         return 500, url_new
 
@@ -430,45 +431,75 @@ def do_url(conf, driver, url, screen=None, pagesrc=None, logf=None):
             with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
                 traceback.print_exception(exc_type, exc_value, exc_traceback,
                                           limit=2, file=f, url=url[3])
-        except:
-            print(e.__str__())
+        except Exception as ee:
+            print(ee.__str__())
         # with open("./data/dst/log.txt" if logf is None else logf, "a") as f:
         #     traceback.print_exception(exc_type, exc_value, exc_traceback,
         #                               limit=2, file=f, url=url[3])
-        if "net::ERR_CONNECTION_RESET" in e.__str__():
-            ERRORNUM = 1
-        elif "net::ERR_NAME_NOT_RESOLVED" in e.__str__():
-            ERRORNUM = 2
-        elif "net::ERR_CONNECTION_REFUSED" in e.__str__():
-            ERRORNUM = 3
-        elif "net::ERR_CONNECTION_TIMED_OUT" in e.__str__():
-            ERRORNUM = 4
-        elif "Timed out receiving message from renderer" in e.__str__():
-            driver.execute_script('window.stop ? window.stop() : document.execCommand("Stop");')
-            time.sleep(2)
-            # driver.refresh()
-            ERRORNUM = 5
-        elif "net::ERR_CONNECTION_CLOSED" in e.__str__():
-            ERRORNUM = 6
-        else:
-            ERRORNUM = 7
-            ERRORSTR[7] = e.__str__()[0:20]
-            print("*****获取标题失败:", url[1], ":", ERRORNUM, url[2], e.__str__()[0:80])
+
+        # print(e.__str__()[0:70])
+        flag = False
+        for er in conf["ERRORSTR"]:
+            ERRORNUM = ERRORNUM + 1
+            if er in e.__str__():
+                flag = True
+                if "Timed out receiving message from renderer" in e.__str__():
+                    ERRORNUM = 0
+                    title = url[3]
+                    driver.execute_script('window.stop ? window.stop() : document.execCommand("Stop");')
+                    time.sleep(2)
+                    source = conf["ERRORSTR"][0]
+                    try:
+                        driver.save_screenshot(screen)
+                    except Exception as e:
+                        print("截图失败", url[2], e.__str__()[0:80])
+                else:
+                    title = "异常"
+                    driver.get_window_size()
+                    save_string_pic(conf["conf"], screen, conf["ERRORSTR"][ERRORNUM-1],
+                                    (driver.get_window_size()['width'], driver.get_window_size()['height']))
+                    source = conf["ERRORSTR"][ERRORNUM-1]
+                # print("已知：", source)
+                break
+        if not flag:
+            source = "未知"
+            print("未知错误*****获取标题失败:", url[1], ":", ERRORNUM, url[2], e.__str__()[0:80])
+
+        # if "net::ERR_CONNECTION_RESET" in e.__str__():
+        #     ERRORNUM = 1
+        # elif "net::ERR_NAME_NOT_RESOLVED" in e.__str__():
+        #     ERRORNUM = 2
+        # elif "net::ERR_CONNECTION_REFUSED" in e.__str__():
+        #     ERRORNUM = 3
+        # elif "net::ERR_CONNECTION_TIMED_OUT" in e.__str__():
+        #     ERRORNUM = 4
+        # elif "Timed out receiving message from renderer" in e.__str__():
+        #     driver.execute_script('window.stop ? window.stop() : document.execCommand("Stop");')
+        #     time.sleep(2)
+        #     # driver.refresh()
+        #     ERRORNUM = 5
+        # elif "net::ERR_CONNECTION_CLOSED" in e.__str__():
+        #     ERRORNUM = 6
+        # else:
+        #     ERRORNUM = 7
+        #     ERRORSTR[7] = e.__str__()[0:20]
+        #     print("*****获取标题失败:", url[1], ":", ERRORNUM, url[2], e.__str__()[0:80])
         # print("\t异常:", url[3], e.__str__()[0:80])
-        current_url = url[3]
-        if ERRORNUM == 5:
-            title = url[3]
-            ERRORNUM = 0
-            source = ERRORSTR[ERRORNUM]
-            try:
-                driver.save_screenshot(screen)
-            except Exception as e:
-                print("截图失败", e.__str__()[0:80])
-        else:
-            title = "异常"
-            driver.get_window_size()
-            save_string_pic(conf, screen, ERRORSTR[ERRORNUM], (driver.get_window_size()['width'], driver.get_window_size()['height']))
-            source = ERRORSTR[ERRORNUM]
+
+        # current_url = url[3]
+        # if ERRORNUM == 5:
+        #     title = url[3]
+        #     ERRORNUM = 0
+        #     source = ERRORSTR[ERRORNUM]
+        #     try:
+        #         driver.save_screenshot(screen)
+        #     except Exception as e:
+        #         print("截图失败", e.__str__()[0:80])
+        # else:
+        #     title = "异常"
+        #     driver.get_window_size()
+        #     save_string_pic(conf, screen, ERRORSTR[ERRORNUM], (driver.get_window_size()['width'], driver.get_window_size()['height']))
+        #     source = ERRORSTR[ERRORNUM]
     finally:
         with open(pagesrc, 'wb') as f:
             f.write(source.encode("utf-8", "ignore"))
@@ -499,7 +530,7 @@ def do_web(data=None, conf=None):
         #     if os.path.exists(screen_file):
         #         print("\t更新....", str(value[1]) + "_" + value[4])
         page_file = os.path.join(conf["pagesource_dir"], str(value[1]) + "_" + value[4] + ".html")
-        (title, url, FD) = do_url(conf["conf"], driver, value, screen=screen_file, pagesrc=page_file,
+        (title, url, FD) = do_url(conf, driver, value, screen=screen_file, pagesrc=page_file,
                                   logf=os.path.join(conf["f_dst_dir"], conf["log"]))
         value[8] = title
         value[9] = url
@@ -609,6 +640,8 @@ def do_alexa(conf, data=None):
         conn = sqlite3.connect(os.path.join(conf["conf"], conf["LOCAL_DB"]))
         c = conn.cursor()
     if alexa_way == 1:  # offline + 重点查询
+        file_path = "file:///" + os.path.abspath('.').replace('\\', '/') + "/conf/public_suffix_list.dat"
+        no_fetch = tldextract.TLDExtract(suffix_list_urls=[file_path])
         for value in alexa_yes:
             alexa_d = "无"
             if value[12] != "" and value[12] != 0:
@@ -618,7 +651,8 @@ def do_alexa(conf, data=None):
             else:
                 if c:
                     sql = "select Alexa_COM from top2w where Domain=?"
-                    ext = tldextract.extract(value[4])
+                    # ext = tldextract.extract(value[4])
+                    ext = no_fetch(value[4])
                     select_data = c.execute(sql, (ext.domain + "." + ext.suffix,))
                     for row in select_data:
                         print("本次排名库中找到...", ext.domain + "." + ext.suffix, row[0])

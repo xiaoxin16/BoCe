@@ -13,6 +13,7 @@
 # C:\Windows\system32>FOR /F "usebackq delims=" %A IN (`python -c "from importlib import util;import os;print(os.path.join(os.path.dirname(util.find_spec('sasl').origin),'sasl2'))"`) DO (
 #   REG ADD "HKEY_LOCAL_MACHINE\SOFTWARE\Carnegie Mellon\Project Cyrus\SASL Library" /v SearchPath /t REG_SZ /d "%A"
 # )
+# https://raw.githubusercontent.com/publicsuffix/list/master/public_suffix_list.dat
 
 # traceback.py
 # def print_exception(etype, value, tb, limit=None, file=None, chain=True, url=None):
